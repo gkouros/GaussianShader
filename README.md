@@ -20,7 +20,7 @@
 </p>
 
 ## Introduction
-The advent of neural 3D Gaussians has recently brought about a revolution in the field of neural rendering, facilitating the generation of high-quality renderings at real-time speeds. However, the explicit and discrete representation encounters challenges when applied to scenes featuring reflective surfaces. In this paper, we present **GaussianShader**, a novel method that applies a simplified shading function on 3D Gaussians to enhance the neural rendering in scenes with reflective surfaces while preserving the training and rendering efficiency. 
+The advent of neural 3D Gaussians has recently brought about a revolution in the field of neural rendering, facilitating the generation of high-quality renderings at real-time speeds. However, the explicit and discrete representation encounters challenges when applied to scenes featuring reflective surfaces. In this paper, we present **GaussianShader**, a novel method that applies a simplified shading function on 3D Gaussians to enhance the neural rendering in scenes with reflective surfaces while preserving the training and rendering efficiency.
 
 <p align="center">
   <a href="">
@@ -48,6 +48,7 @@ The advent of neural 3D Gaussians has recently brought about a revolution in the
 ## Installation
 Provide installation instructions for your project. Include any dependencies and commands needed to set up the project.
 
+
 ```shell
 # Clone the repository
 git clone https://github.com/Asparagus15/GaussianShader.git
@@ -58,11 +59,26 @@ conda env create --file environment.yml
 conda activate gaussian_shader
 ```
 
+For cuda problems reinstall all cuda modules with fixed version:
+```bash
+mamba install -c nvidia cuda-toolkit=11.8 cuda-memcheck=11.8 gds-tools=1.9.1.3 cuda-documentation=11.8 cuda-nvml-dev=11.8 cuda-cccl=11.8 cuda-driver-dev=11.8 cuda-nvrtc-dev=11.8 cuda-profiler-api=11.8 cuda-gdb=11.8 cuda-nvdisasm=11.8 cuda-nvprof=11.8 cuda-sanitizer-api=11.8 cuda-cuobjdump=11.8 cuda-cuxxfilt=11.8 cuda-nvcc=11.8 cuda-nvprune=11.8 cuda-nsight=11.8 cuda-cudart-dev=11.8 cuda-command-line-tools=11.8 cuda-compiler=11.8 cuda-libraries-dev=11.8 cuda-visual-tools=11.8 cuda-tools=11.8 cuda-nsight-compute=11.8 cuda-nvvp=11.8
+
+mamba install -c nvidia cuda-toolkit=12.6 gds-tools=1.9.1.3 cuda-nvml-dev=12.6 cuda-cccl=12.6 cuda-driver-dev=12.6 cuda-nvrtc-dev=12.6 cuda-profiler-api=12.6 cuda-gdb=12.6 cuda-nvdisasm=12.6 cuda-nvprof=12.6 cuda-sanitizer-api=12.6 cuda-cuobjdump=12.6 cuda-cuxxfilt=12.6 cuda-nvcc=12.6 cuda-nvprune=12.6 cuda-nsight=12.6 cuda-cudart-dev=12.6 cuda-command-line-tools=12.6 cuda-compiler=12.6 cuda-libraries-dev=12.6 cuda-visual-tools=12.6 cuda-tools=12.6 cuda-nsight-compute=12.6 cuda-nvvp=12.6
+```
+
+For -lcuda not found error look at: https://github.com/NVlabs/tiny-cuda-nn/issues/183
+and add symlinks from /users/visics/gkouros/miniforge3/envs/igs2/lib/stubs/lcuda
+to /users/visics/gkouros/miniforge3/envs/igs2/lib
+
+For missing nvdiffrast
+```
+pip install git+https://github.com/NVlabs/nvdiffrast/
+```
 
 ## Running
 Download the [example data](https://drive.google.com/file/d/1bSv0soQtjbRj9S9Aq9uQ27EW4wwY--6q/view?usp=sharing) and put it to the ``data`` folder. Execute the optimizer using the following command:
 ```shell
-python train.py -s data/horse_blender --eval -m output/horse_blender -w --brdf_dim 0 --sh_degree -1 --lambda_predicted_normal 2e-1 --brdf_env 512 
+python train.py -s data/horse_blender --eval -m output/horse_blender -w --brdf_dim 0 --sh_degree -1 --lambda_predicted_normal 2e-1 --brdf_env 512
 ```
 
 ## Rendering
