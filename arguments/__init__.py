@@ -3,7 +3,7 @@
 # GRAPHDECO research group, https://team.inria.fr/graphdeco
 # All rights reserved.
 #
-# This software is free for non-commercial, research and evaluation use 
+# This software is free for non-commercial, research and evaluation use
 # under the terms of the LICENSE.md file.
 #
 # For inquiries contact  george.drettakis@inria.fr
@@ -25,7 +25,7 @@ class ParamGroup:
                 shorthand = True
                 key = key[1:]
             t = type(value)
-            value = value if not fill_none else None 
+            value = value if not fill_none else None
             if shorthand:
                 if t == bool:
                     group.add_argument("--" + key, ("-" + key[0:1]), default=value, action="store_true")
@@ -44,9 +44,9 @@ class ParamGroup:
                 setattr(group, arg[0], arg[1])
         return group
 
-class ModelParams(ParamGroup): 
+class ModelParams(ParamGroup):
     def __init__(self, parser, sentinel=False):
-        self.sh_degree = 3
+        self.sh_degree = -1
         self._source_path = ""
         self._model_path = ""
         self._images = "images"
@@ -56,7 +56,7 @@ class ModelParams(ParamGroup):
         self.eval = False
         self.brdf_dim = 0
         self.brdf_mode = "envmap"
-        self.brdf_envmap_res = 64
+        self.brdf_envmap_res = 512
         super().__init__(parser, "Loading Parameters", sentinel)
 
     def extract(self, args):
@@ -100,14 +100,14 @@ class OptimizationParams(ParamGroup):
         self.densify_until_iter = 15_000
         self.densify_grad_threshold = 0.0002
         self.brdf_mlp_lr_init = 1.6e-2
-        self.brdf_mlp_lr_final = 1.6e-3 
+        self.brdf_mlp_lr_final = 1.6e-3
         self.brdf_mlp_lr_delay_mult = 0.01
         self.brdf_mlp_lr_max_steps = 30_000
         self.normal_lr = 0.0002
         self.specular_lr = 0.0002
         self.roughness_lr = 0.0002
         self.normal_reg_from_iter = 0
-        self.normal_reg_util_iter = 30_000
+        self.normal_reg_until_iter = 30_000
         self.lambda_zero_one = 1e-3
         self.lambda_predicted_normal = 2e-1
         self.lambda_delta_reg = 1e-3
