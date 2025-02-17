@@ -3,7 +3,7 @@
 # GRAPHDECO research group, https://team.inria.fr/graphdeco
 # All rights reserved.
 #
-# This software is free for non-commercial, research and evaluation use 
+# This software is free for non-commercial, research and evaluation use
 # under the terms of the LICENSE.md file.
 #
 # For inquiries contact  george.drettakis@inria.fr
@@ -30,6 +30,7 @@ try:
 except ImportError:
     TENSORBOARD_FOUND = False
 
+
 def training(dataset, opt, pipe, testing_iterations, saving_iterations):
     tb_writer = prepare_output_and_logger(dataset)
     gaussians = GaussianModel(dataset.sh_degree, dataset.brdf_dim, dataset.brdf_mode, dataset.brdf_envmap_res)
@@ -46,7 +47,7 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations):
     viewpoint_stack = None
     ema_loss_for_log = 0.0
     progress_bar = tqdm(range(opt.iterations), desc="Training progress")
-    for iteration in range(1, opt.iterations + 1): 
+    for iteration in range(1, opt.iterations + 1):
         if network_gui.conn == None:
             network_gui.try_connect()
         while network_gui.conn != None:
@@ -71,7 +72,7 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations):
         # Pick a random Camera
         if not viewpoint_stack:
             viewpoint_stack = scene.getTrainCameras().copy()
-        viewpoint_cam = viewpoint_stack.pop(randint(0, len(viewpoint_stack)-1)) 
+        viewpoint_cam = viewpoint_stack.pop(randint(0, len(viewpoint_stack)-1))
 
         if pipe.brdf:
             gaussians.set_requires_grad("normal", state=iteration >= opt.normal_reg_from_iter)
@@ -84,7 +85,7 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations):
         image, viewspace_point_tensor, visibility_filter, radii = render_pkg["render"], render_pkg["viewspace_points"], render_pkg["visibility_filter"], render_pkg["radii"]
         losses_extra = {}
         if pipe.brdf and iteration > opt.normal_reg_from_iter:
-            if iteration<opt.normal_reg_util_iter:
+            if iteration<opt.normal_reg_until_iter:
                 losses_extra['predicted_normal'] = predicted_normal_loss(render_pkg["normal"], render_pkg["normal_ref"], render_pkg["alpha"])
             losses_extra['zero_one'] = zero_one_loss(render_pkg["alpha"])
             if "delta_normal_norm" not in render_pkg.keys() and opt.lambda_delta_reg>0: assert()
@@ -127,7 +128,7 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations):
                 if iteration > opt.densify_from_iter and iteration % opt.densification_interval == 0:
                     size_threshold = 20 if iteration > opt.opacity_reset_interval else None
                     gaussians.densify_and_prune(opt.densify_grad_threshold, 0.005, scene.cameras_extent, size_threshold)
-                
+
                 if iteration % opt.opacity_reset_interval == 0 or (dataset.white_background and iteration == opt.densify_from_iter):
                     gaussians.reset_opacity()
 
@@ -140,14 +141,15 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations):
             if pipe.brdf and pipe.brdf_mode=="envmap":
                 gaussians.brdf_mlp.clamp_(min=0.0, max=1.0)
 
-def prepare_output_and_logger(args):    
+
+def prepare_output_and_logger(args):
     if not args.model_path:
         if os.getenv('OAR_JOB_ID'):
             unique_str=os.getenv('OAR_JOB_ID')
         else:
             unique_str = str(uuid.uuid4())
         args.model_path = os.path.join("./output/", unique_str[0:10])
-        
+
     # Set up output folder
     print("Output folder: {}".format(args.model_path))
     os.makedirs(args.model_path, exist_ok = True)
@@ -162,6 +164,7 @@ def prepare_output_and_logger(args):
         print("Tensorboard not available: not logging progress")
     return tb_writer
 
+
 def training_report(tb_writer, iteration, Ll1, loss, losses_extra, l1_loss, elapsed, testing_iterations, scene : Scene, renderFunc, renderArgs):
     if tb_writer:
         tb_writer.add_scalar('train_loss_patches/l1_loss', Ll1.item(), iteration)
@@ -173,7 +176,7 @@ def training_report(tb_writer, iteration, Ll1, loss, losses_extra, l1_loss, elap
     # Report test and samples of training set
     if iteration in testing_iterations:
         torch.cuda.empty_cache()
-        validation_configs = ({'name': 'test', 'cameras' : scene.getTestCameras()}, 
+        validation_configs = ({'name': 'test', 'cameras' : scene.getTestCameras()},
                               {'name': 'train', 'cameras' : [scene.getTrainCameras()[idx % len(scene.getTrainCameras())] for idx in range(5, 30, 5)]})
 
         for config in validation_configs:
@@ -204,13 +207,13 @@ def training_report(tb_writer, iteration, Ll1, loss, losses_extra, l1_loss, elap
                                     render_pkg[k] = 0.5 + (0.5*render_pkg[k]) # (-1, 1) -> (0, 1)
                                 image_k = torch.clamp(render_pkg[k], 0.0, 1.0)
                             tb_writer.add_images(config['name'] + "_view_{}/{}".format(viewpoint.image_name, k), image_k[None], global_step=iteration)
-                        
+
                         if renderArgs[0].brdf:
                             lighting = render_lighting(scene.gaussians, resolution=(512, 1024))
                             if tb_writer:
                                 tb_writer.add_images(config['name'] + "/lighting", lighting[None], global_step=iteration)
                 l1_test = l1_loss(images, gts)
-                psnr_test = psnr(images, gts).mean()  
+                psnr_test = psnr(images, gts).mean()
                 print("\n[ITER {}] Evaluating {}: L1 {} PSNR {}".format(iteration, config['name'], l1_test, psnr_test))
                 if tb_writer:
                     tb_writer.add_scalar(config['name'] + '/loss_viewpoint - l1_loss', l1_test, iteration)
@@ -220,6 +223,7 @@ def training_report(tb_writer, iteration, Ll1, loss, losses_extra, l1_loss, elap
             tb_writer.add_histogram("scene/opacity_histogram", scene.gaussians.get_opacity, iteration)
             tb_writer.add_scalar('total_points', scene.gaussians.get_xyz.shape[0], iteration)
         torch.cuda.empty_cache()
+
 
 if __name__ == "__main__":
     # Set up command line argument parser
@@ -235,11 +239,11 @@ if __name__ == "__main__":
     parser.add_argument("--quiet", action="store_true")
     args = parser.parse_args(sys.argv[1:])
     args.save_iterations.append(args.iterations)
-    
+
     print("Optimizing " + args.model_path)
 
     # Initialize system state (RNG)
-    safe_state(args.quiet)
+    # safe_state(args.quiet)
 
     # Start GUI server, configure and run training
     network_gui.init(args.ip, args.port)
