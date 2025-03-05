@@ -1,10 +1,10 @@
-# Copyright (c) 2020-2022 NVIDIA CORPORATION & AFFILIATES. All rights reserved. 
+# Copyright (c) 2020-2022 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # NVIDIA CORPORATION, its affiliates and licensors retain all intellectual
 # property and proprietary rights in and to this material, related
-# documentation and any modifications thereto. Any use, reproduction, 
-# disclosure or distribution of this material and related documentation 
-# without an express license agreement from NVIDIA CORPORATION or 
+# documentation and any modifications thereto. Any use, reproduction,
+# disclosure or distribution of this material and related documentation
+# without an express license agreement from NVIDIA CORPORATION or
 # its affiliates is strictly prohibited.
 
 import os
@@ -29,13 +29,32 @@ class cubemap_mip(torch.autograd.Function):
         res = dout.shape[1] * 2
         out = torch.zeros(6, res, res, dout.shape[-1], dtype=torch.float32, device="cuda")
         for s in range(6):
-            gy, gx = torch.meshgrid(torch.linspace(-1.0 + 1.0 / res, 1.0 - 1.0 / res, res, device="cuda"), 
+            gy, gx = torch.meshgrid(torch.linspace(-1.0 + 1.0 / res, 1.0 - 1.0 / res, res, device="cuda"),
                                     torch.linspace(-1.0 + 1.0 / res, 1.0 - 1.0 / res, res, device="cuda"),
                                     )
                                     # indexing='ij')
             v = util.safe_normalize(util.cube_to_dir(s, gx, gy))
             out[s, ...] = dr.texture(dout[None, ...] * 0.25, v[None, ...].contiguous(), filter_mode='linear', boundary_mode='cube')
         return out
+
+
+def gamma_tonemap(color, gamma=2.2):
+    """Apply gamma tonemapping to an HDR color tensor.
+
+    Args:
+        color (torch.Tensor): Input HDR color tensor in the range [0,1].
+        gamma (float): Gamma correction value (default 2.2 for sRGB).
+
+    Returns:
+        torch.Tensor: Tonemapped color tensor.
+    """
+    if isinstance(color, torch.Tensor):
+        return torch.clamp(color ** (1.0 / gamma), 0, 1)
+    elif isinstance(color, np.ndarray):
+        return np.clip(color ** (1.0 / gamma), 0, 1)
+    else:
+        raise RuntimeWarning(f"gamma_tonemap is not defined for type {type(color)}")
+
 
 ######################################################################################
 # Split-sum environment map light source with automatic mipmap generation
@@ -49,7 +68,7 @@ class EnvironmentLight(torch.nn.Module):
 
     def __init__(self, base):
         super(EnvironmentLight, self).__init__()
-        self.mtx = None      
+        self.mtx = None
         self.base = torch.nn.Parameter(base.clone().detach(), requires_grad=True)
         self.register_parameter('env_base', self.base)
 
@@ -66,7 +85,7 @@ class EnvironmentLight(torch.nn.Module):
         return torch.where(roughness < self.MAX_ROUGHNESS
                         , (torch.clamp(roughness, self.MIN_ROUGHNESS, self.MAX_ROUGHNESS) - self.MIN_ROUGHNESS) / (self.MAX_ROUGHNESS - self.MIN_ROUGHNESS) * (len(self.specular) - 2)
                         , (torch.clamp(roughness, self.MAX_ROUGHNESS, 1.0) - self.MAX_ROUGHNESS) / (1.0 - self.MAX_ROUGHNESS) + len(self.specular) - 2)
-        
+
     def build_mips(self, cutoff=0.99):
         self.specular = [self.base]
         while self.specular[-1].shape[1] > self.LIGHT_MIN_RES:
@@ -76,7 +95,7 @@ class EnvironmentLight(torch.nn.Module):
 
         for idx in range(len(self.specular) - 1):
             roughness = (idx / (len(self.specular) - 2)) * (self.MAX_ROUGHNESS - self.MIN_ROUGHNESS) + self.MIN_ROUGHNESS
-            self.specular[idx] = ru.specular_cubemap(self.specular[idx], roughness, cutoff) 
+            self.specular[idx] = ru.specular_cubemap(self.specular[idx], roughness, cutoff)
         self.specular[-1] = ru.specular_cubemap(self.specular[-1], 1.0, cutoff)
 
     def regularizer(self):
@@ -181,10 +200,8 @@ class EnvironmentLight(torch.nn.Module):
 def _load_env_hdr(fn, scale=1.0):
     latlong_img = torch.tensor(util.load_image(fn), dtype=torch.float32, device='cuda')*scale
     cubemap = util.latlong_to_cubemap(latlong_img, [512, 512])
-
     l = EnvironmentLight(cubemap)
     l.build_mips()
-
     return l
 
 def load_env(fn, scale=1.0):
@@ -194,10 +211,11 @@ def load_env(fn, scale=1.0):
         assert False, "Unknown envlight extension %s" % os.path.splitext(fn)[1]
 
 def save_env_map(fn, light):
-    assert isinstance(light, EnvironmentLight), "Can only save EnvironmentLight currently"
-    if isinstance(light, EnvironmentLight):
-        color = util.cubemap_to_latlong(light.base, [512, 1024])
+    extract_env_map(light, [512, 1024])
     util.save_image_raw(fn, color.detach().cpu().numpy())
+    util.save_image(fn.replace('hdr', 'png'), color.detach().cpu().numpy())
+    util.save_image('tonemapped_'+fn.replace('hdr', 'png'), gamma_tonemap(color.detach().cpu().numpy()))
+
 
 ######################################################################################
 # Create trainable env map with random initialization

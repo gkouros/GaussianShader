@@ -1,10 +1,10 @@
-# Copyright (c) 2020-2022 NVIDIA CORPORATION & AFFILIATES. All rights reserved. 
+# Copyright (c) 2020-2022 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # NVIDIA CORPORATION, its affiliates and licensors retain all intellectual
 # property and proprietary rights in and to this material, related
-# documentation and any modifications thereto. Any use, reproduction, 
-# disclosure or distribution of this material and related documentation 
-# without an express license agreement from NVIDIA CORPORATION or 
+# documentation and any modifications thereto. Any use, reproduction,
+# disclosure or distribution of this material and related documentation
+# without an express license agreement from NVIDIA CORPORATION or
 # its affiliates is strictly prohibited.
 
 import os
@@ -12,6 +12,9 @@ import numpy as np
 import torch
 import nvdiffrast.torch as dr
 import imageio
+os.environ["OPENCV_IO_ENABLE_OPENEXR"] = "1"
+import imageio
+import cv2
 
 #----------------------------------------------------------------------------
 # Vector operations
@@ -100,53 +103,97 @@ def cube_to_dir(s, x, y):
     elif s == 5: rx, ry, rz = -x, -y, -torch.ones_like(x)
     return torch.stack((rx, ry, rz), dim=-1)
 
+# def latlong_to_cubemap(latlong_map, res):
+#     cubemap = torch.zeros(6, res[0], res[1], latlong_map.shape[-1], dtype=torch.float32, device='cuda')
+#     for s in range(6):
+#         gy, gx = torch.meshgrid(torch.linspace(-1.0 + 1.0 / res[0], 1.0 - 1.0 / res[0], res[0], device='cuda'),
+#                                 torch.linspace(-1.0 + 1.0 / res[1], 1.0 - 1.0 / res[1], res[1], device='cuda'),
+#                                 # indexing='ij')
+#                                 )
+#         v = safe_normalize(cube_to_dir(s, gx, gy))
+
+#         tu = torch.atan2(v[..., 0:1], -v[..., 2:3]) / (2 * np.pi) + 0.5
+#         tv = torch.acos(torch.clamp(v[..., 1:2], min=-1, max=1)) / np.pi
+#         texcoord = torch.cat((tu, tv), dim=-1)
+
+#         cubemap[s, ...] = dr.texture(latlong_map[None, ...], texcoord[None, ...], filter_mode='linear')[0]
+#     return cubemap
+
+# def latlong_to_cubemap(latlong_map, res):
+#     cubemap = torch.zeros(6, res[0], res[1], latlong_map.shape[-1], dtype=torch.float32, device='cuda')
+#     for s in range(6):
+#         gy, gx = torch.meshgrid(torch.linspace(-1.0 + 1.0 / res[0], 1.0 - 1.0 / res[0], res[0], device='cuda'),
+#                                 torch.linspace(-1.0 + 1.0 / res[1], 1.0 - 1.0 / res[1], res[1], device='cuda'),
+#                                 # indexing='ij')
+#                                 )
+#         v = safe_normalize(cube_to_dir(s, gx, gy))
+
+#         tu = torch.atan2(v[..., 0:1], -v[..., 2:3]) / (2 * np.pi) + 0.5
+#         tv = torch.acos(torch.clamp(v[..., 1:2], min=-1, max=1)) / np.pi
+#         texcoord = torch.cat((tu, tv), dim=-1)
+
+#         cubemap[s, ...] = dr.texture(latlong_map[None, ...], texcoord[None, ...], filter_mode='linear')[0]
+#     return cubemap
+
 def latlong_to_cubemap(latlong_map, res):
     cubemap = torch.zeros(6, res[0], res[1], latlong_map.shape[-1], dtype=torch.float32, device='cuda')
     for s in range(6):
-        gy, gx = torch.meshgrid(torch.linspace(-1.0 + 1.0 / res[0], 1.0 - 1.0 / res[0], res[0], device='cuda'), 
+        gy, gx = torch.meshgrid(torch.linspace(-1.0 + 1.0 / res[0], 1.0 - 1.0 / res[0], res[0], device='cuda'),
                                 torch.linspace(-1.0 + 1.0 / res[1], 1.0 - 1.0 / res[1], res[1], device='cuda'),
                                 # indexing='ij')
                                 )
         v = safe_normalize(cube_to_dir(s, gx, gy))
 
-        tu = torch.atan2(v[..., 0:1], -v[..., 2:3]) / (2 * np.pi) + 0.5
-        tv = torch.acos(torch.clamp(v[..., 1:2], min=-1, max=1)) / np.pi
+        tu = torch.atan2(-v[..., 1:2], v[..., 0:1]) / (2 * np.pi) + 0.5
+        tv = torch.acos(torch.clamp(v[..., 2:3], min=-1, max=1)) / np.pi
+
         texcoord = torch.cat((tu, tv), dim=-1)
 
         cubemap[s, ...] = dr.texture(latlong_map[None, ...], texcoord[None, ...], filter_mode='linear')[0]
+
     return cubemap
 
+# def cubemap_to_latlong(cubemap, res):
+#     gy, gx = torch.meshgrid(torch.linspace( 0.0 + 1.0 / res[0], 1.0 - 1.0 / res[0], res[0], device='cuda'),
+#                             torch.linspace(-1.0 + 1.0 / res[1], 1.0 - 1.0 / res[1], res[1], device='cuda'),
+#                             # indexing='ij')
+#                             )
+
+#     sintheta, costheta = torch.sin(gy*np.pi), torch.cos(gy*np.pi)
+#     sinphi, cosphi     = torch.sin(gx*np.pi), torch.cos(gx*np.pi)
+
+#     reflvec = torch.stack((
+#         sintheta*sinphi,
+#         costheta,
+#         -sintheta*cosphi
+#         ), dim=-1)
+#     return dr.texture(cubemap[None, ...], reflvec[None, ...].contiguous(), filter_mode='linear', boundary_mode='cube')[0]
+
+# def cubemap_to_latlong2(cubemap, res):
+#     gy, gx = torch.meshgrid(torch.linspace( 0.0 + 1.0 / res[0], 1.0 - 1.0 / res[0], res[0], device='cuda'),
+#                             torch.linspace(-1.0 + 1.0 / res[1], 1.0 - 1.0 / res[1], res[1], device='cuda'),
+#                             # indexing='ij')
+#                             )
+
+#     sintheta, costheta = torch.sin(gx*np.pi), torch.cos(gx*np.pi)
+#     sinphi, cosphi     = torch.sin(gy*np.pi), torch.cos(gy*np.pi)
+
+#     reflvec = torch.stack((
+#         sintheta*sinphi,
+#         costheta,
+#         -sintheta*cosphi
+#         ), dim=-1)
+#     return dr.texture(cubemap[None, ...], reflvec[None, ...].contiguous(), filter_mode='linear', boundary_mode='cube')[0]
+
 def cubemap_to_latlong(cubemap, res):
-    gy, gx = torch.meshgrid(torch.linspace( 0.0 + 1.0 / res[0], 1.0 - 1.0 / res[0], res[0], device='cuda'), 
-                            torch.linspace(-1.0 + 1.0 / res[1], 1.0 - 1.0 / res[1], res[1], device='cuda'),
-                            # indexing='ij')
-                            )
-    
-    sintheta, costheta = torch.sin(gy*np.pi), torch.cos(gy*np.pi)
-    sinphi, cosphi     = torch.sin(gx*np.pi), torch.cos(gx*np.pi)
-    
-    reflvec = torch.stack((
-        sintheta*sinphi, 
-        costheta, 
-        -sintheta*cosphi
-        ), dim=-1)
+    X, Y = np.meshgrid(np.linspace(-np.pi, np.pi, res[1], dtype=np.float32), np.linspace(0, np.pi, res[0], dtype=np.float32), indexing='xy')
+    XY = np.stack([X, Y], axis=2)
+    z = np.cos(XY[..., 1])
+    x = np.sin(XY[..., 1]) * np.cos(XY[...,0])
+    y = -np.sin(XY[..., 1]) * np.sin(XY[...,0])
+    reflvec = torch.tensor(np.stack([x,y,z], axis=-1)).cuda()
     return dr.texture(cubemap[None, ...], reflvec[None, ...].contiguous(), filter_mode='linear', boundary_mode='cube')[0]
 
-def cubemap_to_latlong2(cubemap, res):
-    gy, gx = torch.meshgrid(torch.linspace( 0.0 + 1.0 / res[0], 1.0 - 1.0 / res[0], res[0], device='cuda'), 
-                            torch.linspace(-1.0 + 1.0 / res[1], 1.0 - 1.0 / res[1], res[1], device='cuda'),
-                            # indexing='ij')
-                            )
-    
-    sintheta, costheta = torch.sin(gx*np.pi), torch.cos(gx*np.pi)
-    sinphi, cosphi     = torch.sin(gy*np.pi), torch.cos(gy*np.pi)
-    
-    reflvec = torch.stack((
-        sintheta*sinphi, 
-        costheta, 
-        -sintheta*cosphi
-        ), dim=-1)
-    return dr.texture(cubemap[None, ...], reflvec[None, ...].contiguous(), filter_mode='linear', boundary_mode='cube')[0]
 
 #----------------------------------------------------------------------------
 # Image scaling
@@ -204,9 +251,9 @@ def focal_length_to_fovy(focal_length, sensor_height):
 # Reworked so this matches gluPerspective / glm::perspective, using fovy
 def perspective(fovy=0.7854, aspect=1.0, n=0.1, f=1000.0, device=None):
     y = np.tan(fovy / 2)
-    return torch.tensor([[1/(y*aspect),    0,            0,              0], 
-                         [           0, 1/-y,            0,              0], 
-                         [           0,    0, -(f+n)/(f-n), -(2*f*n)/(f-n)], 
+    return torch.tensor([[1/(y*aspect),    0,            0,              0],
+                         [           0, 1/-y,            0,              0],
+                         [           0,    0, -(f+n)/(f-n), -(2*f*n)/(f-n)],
                          [           0,    0,           -1,              0]], dtype=torch.float32, device=device)
 
 # Reworked so this matches gluPerspective / glm::perspective, using fovy
@@ -227,37 +274,37 @@ def perspective_offcenter(fovy, fraction, rx, ry, aspect=1.0, n=0.1, f=1000.0, d
     r = l + width
     b = B + ystart
     t = b + height
-    
+
     # https://www.scratchapixel.com/lessons/3d-basic-rendering/perspective-and-orthographic-projection-matrix/opengl-perspective-projection-matrix
-    return torch.tensor([[2/(r-l),        0,  (r+l)/(r-l),              0], 
-                         [      0, -2/(t-b),  (t+b)/(t-b),              0], 
-                         [      0,        0, -(f+n)/(f-n), -(2*f*n)/(f-n)], 
+    return torch.tensor([[2/(r-l),        0,  (r+l)/(r-l),              0],
+                         [      0, -2/(t-b),  (t+b)/(t-b),              0],
+                         [      0,        0, -(f+n)/(f-n), -(2*f*n)/(f-n)],
                          [      0,        0,           -1,              0]], dtype=torch.float32, device=device)
 
 def translate(x, y, z, device=None):
-    return torch.tensor([[1, 0, 0, x], 
-                         [0, 1, 0, y], 
-                         [0, 0, 1, z], 
+    return torch.tensor([[1, 0, 0, x],
+                         [0, 1, 0, y],
+                         [0, 0, 1, z],
                          [0, 0, 0, 1]], dtype=torch.float32, device=device)
 
 def rotate_x(a, device=None):
     s, c = np.sin(a), np.cos(a)
-    return torch.tensor([[1,  0, 0, 0], 
-                         [0,  c, s, 0], 
-                         [0, -s, c, 0], 
+    return torch.tensor([[1,  0, 0, 0],
+                         [0,  c, s, 0],
+                         [0, -s, c, 0],
                          [0,  0, 0, 1]], dtype=torch.float32, device=device)
 
 def rotate_y(a, device=None):
     s, c = np.sin(a), np.cos(a)
-    return torch.tensor([[ c, 0, s, 0], 
-                         [ 0, 1, 0, 0], 
-                         [-s, 0, c, 0], 
+    return torch.tensor([[ c, 0, s, 0],
+                         [ 0, 1, 0, 0],
+                         [-s, 0, c, 0],
                          [ 0, 0, 0, 1]], dtype=torch.float32, device=device)
 
 def scale(s, device=None):
-    return torch.tensor([[ s, 0, 0, 0], 
-                         [ 0, s, 0, 0], 
-                         [ 0, 0, s, 0], 
+    return torch.tensor([[ s, 0, 0, 0],
+                         [ 0, s, 0, 0],
+                         [ 0, 0, s, 0],
                          [ 0, 0, 0, 1]], dtype=torch.float32, device=device)
 
 def lookAt(eye, at, up):
@@ -266,13 +313,13 @@ def lookAt(eye, at, up):
     u = torch.cross(up, w)
     u = u / torch.linalg.norm(u)
     v = torch.cross(w, u)
-    translate = torch.tensor([[1, 0, 0, -eye[0]], 
-                              [0, 1, 0, -eye[1]], 
-                              [0, 0, 1, -eye[2]], 
+    translate = torch.tensor([[1, 0, 0, -eye[0]],
+                              [0, 1, 0, -eye[1]],
+                              [0, 0, 1, -eye[2]],
                               [0, 0, 0, 1]], dtype=eye.dtype, device=eye.device)
-    rotate = torch.tensor([[u[0], u[1], u[2], 0], 
-                           [v[0], v[1], v[2], 0], 
-                           [w[0], w[1], w[2], 0], 
+    rotate = torch.tensor([[u[0], u[1], u[2], 0],
+                           [v[0], v[1], v[2], 0],
+                           [w[0], w[1], w[2], 0],
                            [0, 0, 0, 1]], dtype=eye.dtype, device=eye.device)
     return rotate @ translate
 
@@ -299,7 +346,7 @@ def random_rotation(device=None):
     return torch.tensor(m, dtype=torch.float32, device=device)
 
 #----------------------------------------------------------------------------
-# Compute focal points of a set of lines using least squares. 
+# Compute focal points of a set of lines using least squares.
 # handy for poorly centered datasets
 #----------------------------------------------------------------------------
 
@@ -351,7 +398,7 @@ def cosine_sample(N, size=None):
 
 def bilinear_downsample(x : torch.tensor) -> torch.Tensor:
     w = torch.tensor([[1, 3, 3, 1], [3, 9, 9, 3], [3, 9, 9, 3], [1, 3, 3, 1]], dtype=torch.float32, device=x.device) / 64.0
-    w = w.expand(x.shape[-1], 1, 4, 4) 
+    w = w.expand(x.shape[-1], 1, 4, 4)
     x = torch.nn.functional.conv2d(x.permute(0, 3, 1, 2), w, padding=1, stride=2, groups=x.shape[-1])
     return x.permute(0, 2, 3, 1)
 
@@ -362,7 +409,7 @@ def bilinear_downsample(x : torch.tensor) -> torch.Tensor:
 def bilinear_downsample(x : torch.tensor, spp) -> torch.Tensor:
     w = torch.tensor([[1, 3, 3, 1], [3, 9, 9, 3], [3, 9, 9, 3], [1, 3, 3, 1]], dtype=torch.float32, device=x.device) / 64.0
     g = x.shape[-1]
-    w = w.expand(g, 1, 4, 4) 
+    w = w.expand(g, 1, 4, 4)
     x = x.permute(0, 3, 1, 2) # NHWC -> NCHW
     steps = int(np.log2(spp))
     for _ in range(steps):
@@ -453,7 +500,9 @@ def save_image_raw(fn, x : np.ndarray):
 
 
 def load_image_raw(fn) -> np.ndarray:
-    return imageio.imread(fn)
+    # return imageio.imread(fn)
+    return cv2.cvtColor(cv2.imread(fn, cv2.IMREAD_UNCHANGED), cv2.COLOR_BGR2RGB)
+
 
 def load_image(fn) -> np.ndarray:
     img = load_image_raw(fn)
