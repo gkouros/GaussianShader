@@ -17,11 +17,11 @@ parser.add_argument('--skip_metrics', help='Skip rendering step', action='store_
 
 args = parser.parse_args()
 
-dataset = "ref_shiny"
+dataset = "glossy_synthetic"
 if args.debug:
-    scenes = ["helmet"]
+    scenes = ["bell"]
 else:
-    scenes = ["ball", "car", "coffee", "helmet", "teapot", "toaster"]
+    scenes = ["angel", "bell", "cat", "horse", "luyu", "potion", "tbell", "teapot"]
 
 factors = [1]
 
