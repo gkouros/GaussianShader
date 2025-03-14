@@ -1,4 +1,4 @@
-# training scripts for the shiny blender datasets
+# training scripts for the shiny real datasets
 # this script is adopted from GOF
 # https://github.com/autonomousvision/gaussian-opacity-fields/blob/main/scripts/run_nerf_synthetic.py
 import os
