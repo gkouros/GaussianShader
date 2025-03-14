@@ -211,7 +211,7 @@ def load_env(fn, scale=1.0):
         assert False, "Unknown envlight extension %s" % os.path.splitext(fn)[1]
 
 def save_env_map(fn, light):
-    extract_env_map(light, [512, 1024])
+    color = extract_env_map(light, [512, 1024])
     util.save_image_raw(fn, color.detach().cpu().numpy())
     util.save_image(fn.replace('hdr', 'png'), color.detach().cpu().numpy())
     util.save_image('tonemapped_'+fn.replace('hdr', 'png'), gamma_tonemap(color.detach().cpu().numpy()))
