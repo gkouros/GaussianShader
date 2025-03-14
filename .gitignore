@@ -10,3 +10,5 @@ data
 logs
 condor
 test*.sh
+slurm/
+*.sif
