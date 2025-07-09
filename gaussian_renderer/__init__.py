@@ -149,6 +149,8 @@ def render(viewpoint_camera, pc : GaussianModel, pipe, bg_color : torch.Tensor, 
                 colors_precomp = color.squeeze() # (N, 3)
                 diffuse_color = brdf_pkg['diffuse'].squeeze() # (N, 3)
                 specular_color = brdf_pkg['specular'].squeeze() # (N, 3)
+                reflvec = brdf_pkg["reflvec"].squeeze()
+                ndotv = brdf_pkg["ndotv"].squeeze()
 
                 if pc.brdf_dim>0:
                     shs_view = pc.get_brdf_features.view(-1, 3, (pc.brdf_dim+1)**2)
@@ -200,6 +202,7 @@ def render(viewpoint_camera, pc : GaussianModel, pipe, bg_color : torch.Tensor, 
             render_extras.update({"normal": normal_normed})
             if delta_normal_norm is not None:
                 render_extras.update({"delta_normal_norm": delta_normal_norm.repeat(1, 3)})
+            reflvec_normed = 0.5 * reflvec + 0.5
             if debug:
                 render_extras.update({
                     "diffuse": diffuse,
@@ -208,6 +211,8 @@ def render(viewpoint_camera, pc : GaussianModel, pipe, bg_color : torch.Tensor, 
                     "diffuse_color": diffuse_color,
                     "specular_color": specular_color,
                     "color_delta": color_delta,
+                    "reflvec": reflvec_normed,
+                    "ndotv": ndotv[..., None].repeat(1, 3),
                     })
 
         out_extras = {}
@@ -223,8 +228,9 @@ def render(viewpoint_camera, pc : GaussianModel, pipe, bg_color : torch.Tensor, 
                 rotations = rotations,
                 cov3D_precomp = cov3D_precomp)[0]
             out_extras[k] = image
+            
 
-        for k in["normal", "normal_axis"] if debug else ["normal"]:
+        for k in["normal", "normal_axis", "reflvec"] if debug else ["normal"]:
             if k in out_extras.keys():
                 out_extras[k] = (out_extras[k] - 0.5) * 2. # range (0, 1) -> (-1, 1)
 
