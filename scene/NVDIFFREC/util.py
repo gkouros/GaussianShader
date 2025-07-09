@@ -60,6 +60,23 @@ def srgb_to_rgb(f: torch.Tensor) -> torch.Tensor:
 def reinhard(f: torch.Tensor) -> torch.Tensor:
     return f/(1+f)
 
+def gamma_tonemap(color, gamma=2.2):
+    """Apply gamma tonemapping to an HDR color tensor.
+
+    Args:
+        color (torch.Tensor): Input HDR color tensor in the range [0,1].
+        gamma (float): Gamma correction value (default 2.2 for sRGB).
+
+    Returns:
+        torch.Tensor: Tonemapped color tensor.
+    """
+    if isinstance(color, torch.Tensor):
+        return torch.clamp(color ** (1.0 / gamma), 0, 1)
+    elif isinstance(color, np.ndarray):
+        return np.clip(color ** (1.0 / gamma), 0, 1)
+    else:
+        raise RuntimeWarning(f"gamma_tonemap is not defined for type {type(color)}")
+
 #-----------------------------------------------------------------------------------
 # Metrics (taken from jaxNerf source code, in order to replicate their measurements)
 #
@@ -169,21 +186,6 @@ def latlong_to_cubemap(latlong_map, res):
 #         ), dim=-1)
 #     return dr.texture(cubemap[None, ...], reflvec[None, ...].contiguous(), filter_mode='linear', boundary_mode='cube')[0]
 
-# def cubemap_to_latlong2(cubemap, res):
-#     gy, gx = torch.meshgrid(torch.linspace( 0.0 + 1.0 / res[0], 1.0 - 1.0 / res[0], res[0], device='cuda'),
-#                             torch.linspace(-1.0 + 1.0 / res[1], 1.0 - 1.0 / res[1], res[1], device='cuda'),
-#                             # indexing='ij')
-#                             )
-
-#     sintheta, costheta = torch.sin(gx*np.pi), torch.cos(gx*np.pi)
-#     sinphi, cosphi     = torch.sin(gy*np.pi), torch.cos(gy*np.pi)
-
-#     reflvec = torch.stack((
-#         sintheta*sinphi,
-#         costheta,
-#         -sintheta*cosphi
-#         ), dim=-1)
-#     return dr.texture(cubemap[None, ...], reflvec[None, ...].contiguous(), filter_mode='linear', boundary_mode='cube')[0]
 
 def cubemap_to_latlong(cubemap, res):
     X, Y = np.meshgrid(np.linspace(-np.pi, np.pi, res[1], dtype=np.float32), np.linspace(0, np.pi, res[0], dtype=np.float32), indexing='xy')
@@ -194,6 +196,14 @@ def cubemap_to_latlong(cubemap, res):
     reflvec = torch.tensor(np.stack([x,y,z], axis=-1)).cuda()
     return dr.texture(cubemap[None, ...], reflvec[None, ...].contiguous(), filter_mode='linear', boundary_mode='cube')[0]
 
+def cubemap_to_latlong2(cubemap, res):
+    gy, gx = torch.meshgrid(torch.linspace( 0.0 + 1.0 / res[0], 1.0 - 1.0 / res[0], res[0], device='cuda'),
+                            torch.linspace(-1.0 + 1.0 / res[1], 1.0 - 1.0 / res[1], res[1], device='cuda'))
+                            # indexing='ij')
+    sintheta, costheta = torch.sin(gx*np.pi), torch.cos(gx*np.pi)
+    sinphi, cosphi     = torch.sin(gy*np.pi), torch.cos(gy*np.pi)
+    reflvec = torch.stack((sintheta*sinphi, costheta, -sintheta*cosphi), dim=-1)
+    return dr.texture(cubemap[None, ...], reflvec[None, ...].contiguous(), filter_mode='linear', boundary_mode='cube')[0]
 
 #----------------------------------------------------------------------------
 # Image scaling

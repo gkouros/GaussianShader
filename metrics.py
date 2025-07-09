@@ -3,7 +3,7 @@
 # GRAPHDECO research group, https://team.inria.fr/graphdeco
 # All rights reserved.
 #
-# This software is free for non-commercial, research and evaluation use 
+# This software is free for non-commercial, research and evaluation use
 # under the terms of the LICENSE.md file.
 #
 # For inquiries contact  george.drettakis@inria.fr
@@ -33,7 +33,7 @@ def readImages(renders_dir, gt_dir):
         image_names.append(fname)
     return renders, gts, image_names
 
-def evaluate(model_paths):
+def evaluate(model_paths, args):
 
     full_dict = {}
     per_view_dict = {}
@@ -49,7 +49,7 @@ def evaluate(model_paths):
         full_dict_polytopeonly[scene_dir] = {}
         per_view_dict_polytopeonly[scene_dir] = {}
 
-        test_dir = Path(scene_dir) / "test"
+        test_dir = Path(scene_dir) / args.test_dir
 
         for method in os.listdir(test_dir):
             print("Method:", method)
@@ -85,9 +85,9 @@ def evaluate(model_paths):
                                                         "PSNR": {name: psnr for psnr, name in zip(torch.tensor(psnrs).tolist(), image_names)},
                                                         "LPIPS": {name: lp for lp, name in zip(torch.tensor(lpipss).tolist(), image_names)}})
 
-        with open(scene_dir + "/results.json", 'w') as fp:
+        with open(method_dir / "results.json", 'w') as fp:
             json.dump(full_dict[scene_dir], fp, indent=True)
-        with open(scene_dir + "/per_view.json", 'w') as fp:
+        with open(method_dir / "per_view.json", 'w') as fp:
             json.dump(per_view_dict[scene_dir], fp, indent=True)
         # except:
         #     print("Unable to compute metrics for model", scene_dir)
@@ -99,5 +99,6 @@ if __name__ == "__main__":
     # Set up command line argument parser
     parser = ArgumentParser(description="Training script parameters")
     parser.add_argument('--model_paths', '-m', required=True, nargs="+", type=str, default=[])
+    parser.add_argument('--test_dir', type=str, default="test")
     args = parser.parse_args()
-    evaluate(args.model_paths)
+    evaluate(args.model_paths, args)

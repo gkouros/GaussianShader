@@ -3,7 +3,7 @@
 # GRAPHDECO research group, https://team.inria.fr/graphdeco
 # All rights reserved.
 #
-# This software is free for non-commercial, research and evaluation use 
+# This software is free for non-commercial, research and evaluation use
 # under the terms of the LICENSE.md file.
 #
 # For inquiries contact  george.drettakis@inria.fr
@@ -37,7 +37,7 @@ class GaussianModel:
         self.brdf = brdf_dim>=0
 
         self.active_sh_degree = 0
-        self.max_sh_degree = sh_degree  
+        self.max_sh_degree = sh_degree
 
         self._xyz = torch.empty(0)
         self._features_dc = torch.empty(0)
@@ -49,9 +49,9 @@ class GaussianModel:
         self.xyz_gradient_accum = torch.empty(0)
 
         # brdf setting
-        self.brdf_dim = brdf_dim  
-        self.brdf_mode = brdf_mode  
-        self.brdf_envmap_res = brdf_envmap_res  
+        self.brdf_dim = brdf_dim
+        self.brdf_mode = brdf_mode
+        self.brdf_envmap_res = brdf_envmap_res
         self._normal = torch.empty(0)
         self._normal2 = torch.empty(0)
         self._specular = torch.empty(0)
@@ -60,8 +60,8 @@ class GaussianModel:
         if self.brdf:
             self.brdf_mlp = create_trainable_env_rnd(self.brdf_envmap_res, scale=0.0, bias=0.8)
         else:
-            self.brdf_mlp = None    
-        
+            self.brdf_mlp = None
+
         self.diffuse_activation = torch.sigmoid
         self.specular_activation = torch.sigmoid
         self.default_roughness = 0.0
@@ -84,25 +84,25 @@ class GaussianModel:
     @property
     def get_scaling(self):
         return self.scaling_activation(self._scaling)
-    
+
     @property
     def get_rotation(self):
         return self.rotation_activation(self._rotation)
-    
+
     @property
     def get_xyz(self):
         return self._xyz
-    
+
     @property
     def get_features(self):
         features_dc = self._features_dc
         features_rest = self._features_rest
         return torch.cat((features_dc, features_rest), dim=1)
-    
+
     @property
     def get_opacity(self):
         return self.opacity_activation(self._opacity)
-    
+
     def get_covariance(self, scaling_modifier = 1):
         return self.covariance_activation(self.get_scaling, scaling_modifier, self._rotation)
 
@@ -110,12 +110,12 @@ class GaussianModel:
         normal_axis = self.get_minimum_axis
         normal_axis = normal_axis
         normal_axis, positive = flip_align_view(normal_axis, dir_pp_normalized)
-        delta_normal1 = self._normal  # (N, 3) 
-        delta_normal2 = self._normal2 # (N, 3) 
+        delta_normal1 = self._normal  # (N, 3)
+        delta_normal2 = self._normal2 # (N, 3)
         delta_normal = torch.stack([delta_normal1, delta_normal2], dim=-1) # (N, 3, 2)
         idx = torch.where(positive, 0, 1).long()[:,None,:].repeat(1, 3, 1) # (N, 3, 1)
         delta_normal = torch.gather(delta_normal, index=idx, dim=-1).squeeze(-1) # (N, 3)
-        normal = delta_normal + normal_axis 
+        normal = delta_normal + normal_axis
         normal = normal/normal.norm(dim=1, keepdim=True) # (N, 3)
         if return_delta:
             return normal, delta_normal
@@ -192,7 +192,7 @@ class GaussianModel:
             normals2 = np.copy(normals)
 
             self._normal = nn.Parameter(torch.from_numpy(normals).to(self._xyz.device).requires_grad_(True))
-            specular_len = 3 
+            specular_len = 3
             self._specular = nn.Parameter(torch.zeros((fused_point_cloud.shape[0], specular_len), device="cuda").requires_grad_(True))
             self._roughness = nn.Parameter(self.default_roughness*torch.ones((fused_point_cloud.shape[0], 1), device="cuda").requires_grad_(True))
             self._normal2 = nn.Parameter(torch.from_numpy(normals2).to(self._xyz.device).requires_grad_(True))
@@ -250,12 +250,12 @@ class GaussianModel:
         ]
 
         self.optimizer = torch.optim.Adam(l, lr=0.0, eps=1e-15)
-        
+
         # self.f_rest_scheduler_args = get_const_lr_func(training_args.feature_lr / 20.0)
         if not self.fix_brdf_lr:
             self.f_rest_scheduler_args = get_expon_lr_func(lr_init=training_args.feature_lr / 20.0,
                                         lr_final=training_args.feature_lr_final / 20.0,
-                                        lr_delay_steps=30000, 
+                                        lr_delay_steps=30000,
                                         lr_delay_mult=training_args.brdf_mlp_lr_delay_mult,
                                         max_steps=40000)
                                         # max_steps=training_args.iterations)
@@ -322,7 +322,7 @@ class GaussianModel:
         rotation = self._rotation.detach().cpu().numpy()
         roughness = None if not self.brdf else self._roughness.detach().cpu().numpy()
         specular = None if not self.brdf else self._specular.detach().cpu().numpy()
-        
+
         if viewer_fmt:
             f_dc = 0.5 + (0.5*normals)
             f_rest = np.zeros((f_rest.shape[0], 45))
@@ -348,6 +348,11 @@ class GaussianModel:
         opacities_new = inverse_sigmoid(torch.min(self.get_opacity, torch.ones_like(self.get_opacity)*0.01))
         optimizable_tensors = self.replace_tensor_to_optimizer(opacities_new, "opacity")
         self._opacity = optimizable_tensors["opacity"]
+
+    def load_env_map(self, path, tonemap=lambda x: x, rotate=False):
+        if not any([path.lower().endswith(x) for x in [".hdr", ".hdri", ".exr", ".tiff", ".pfm", ".jpg", ".png"]]):
+            path = os.path.join(path, "brdf_mlp.hdr")
+        self.brdf_mlp = load_env(path, scale=1.0, res=[self.brdf_envmap_res]*2, tonemap=tonemap, rotate=rotate)
 
     def load_ply(self, path, og_number_points=-1):
         self.og_number_points = og_number_points
@@ -403,7 +408,7 @@ class GaussianModel:
         rots = np.zeros((xyz.shape[0], len(rot_names)))
         for idx, attr_name in enumerate(rot_names):
             rots[:, idx] = np.asarray(plydata.elements[0][attr_name])
-        
+
         if self.brdf:
             roughness = np.asarray(plydata.elements[0]["roughness"])[..., np.newaxis]
 
@@ -572,7 +577,7 @@ class GaussianModel:
         new_specular = self._specular[selected_pts_mask].repeat(N,1) if self.brdf else None
         new_normal = self._normal[selected_pts_mask].repeat(N,1) if self.brdf else None
         new_normal2 = self._normal2[selected_pts_mask].repeat(N,1) if (self.brdf) else None
-        self.densification_postfix(new_xyz, new_features_dc, new_features_rest, new_opacity, new_scaling, new_rotation, 
+        self.densification_postfix(new_xyz, new_features_dc, new_features_rest, new_opacity, new_scaling, new_rotation,
                                    new_roughness, new_specular, new_normal, new_normal2)
 
         prune_filter = torch.cat((selected_pts_mask, torch.zeros(N * selected_pts_mask.sum(), device="cuda", dtype=bool)))
@@ -596,7 +601,7 @@ class GaussianModel:
         new_normal = self._normal[selected_pts_mask] if self.brdf else None
         new_normal2 = self._normal2[selected_pts_mask] if (self.brdf) else None
 
-        self.densification_postfix(new_xyz, new_features_dc, new_features_rest, new_opacities, new_scaling, new_rotation, 
+        self.densification_postfix(new_xyz, new_features_dc, new_features_rest, new_opacities, new_scaling, new_rotation,
                                    new_roughness, new_specular, new_normal, new_normal2)
 
     def densify_and_prune(self, max_grad, min_opacity, extent, max_screen_size):
@@ -618,6 +623,6 @@ class GaussianModel:
     def add_densification_stats(self, viewspace_point_tensor, update_filter):
         self.xyz_gradient_accum[update_filter] += torch.norm(viewspace_point_tensor.grad[update_filter,:2], dim=-1, keepdim=True)
         self.denom[update_filter] += 1
-    
+
     def set_requires_grad(self, attrib_name, state: bool):
         getattr(self, f"_{attrib_name}").requires_grad = state

@@ -13,6 +13,8 @@ parser.add_argument('out', help='Input experiment name')
 parser.add_argument('--skip_train', help='Skip training step', action='store_true')
 parser.add_argument('--skip_render', help='Skip rendering step', action='store_true')
 parser.add_argument('--skip_metrics', help='Skip rendering step', action='store_true')
+parser.add_argument('--skip_relight', help='Skip relighting step', action='store_true')
+parser.add_argument('--skip_relight_metrics', help='Skip relighting step', action='store_true')
 
 args = parser.parse_args()
 
@@ -49,6 +51,21 @@ def train_scene(gpu, scene, factor):
         cmd = f"OMP_NUM_THREADS=4 CUDA_VISIBLE_DEVICES={gpu} python metrics.py -m {output_dir}/{scene}"
         print(cmd)
         run_script(cmd)
+
+    if not args.skip_relight:
+        envmaps_path = os.path.join(dataset_dir, "relight_gt")
+        envmaps = ["corridor", "golf", "neon"] if not args.debug else ["corridor"]
+        for envmap_name in envmaps:
+            cmd = f"OMP_NUM_THREADS=4 CUDA_VISIBLE_DEVICES={gpu} python render.py -m {output_dir}/{scene} --skip_train --skip_test"
+            cmd += f" --relight_gt_path {dataset_dir}/relight_gt/{scene}_{envmap_name}"
+            cmd += f" --relight_envmap_path {envmaps_path}/{envmap_name}.exr"
+            cmd += f" --rescale_relighted"
+            run_script(cmd)
+
+            if not args.skip_relight_metrics:
+                cmd = f"OMP_NUM_THREADS=4 CUDA_VISIBLE_DEVICES={gpu} python metrics.py -m {output_dir}/{scene}"
+                cmd += f" --test_dir=relight/{envmap_name}.exr"
+                run_script(cmd)
 
     return True
 
