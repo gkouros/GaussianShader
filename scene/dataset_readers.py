@@ -3,7 +3,7 @@
 # GRAPHDECO research group, https://team.inria.fr/graphdeco
 # All rights reserved.
 #
-# This software is free for non-commercial, research and evaluation use 
+# This software is free for non-commercial, research and evaluation use
 # under the terms of the LICENSE.md file.
 #
 # For inquiries contact  george.drettakis@inria.fr
@@ -101,7 +101,7 @@ def readColmapCameras(cam_extrinsics, cam_intrinsics, images_folder):
         image = Image.open(image_path)
 
         cam_info = CameraInfo(uid=uid, R=R, T=T, FovY=FovY, FovX=FovX, image=image,
-                              image_path=image_path, image_name=image_name, width=width, height=height, 
+                              image_path=image_path, image_name=image_name, width=width, height=height,
                               normal_image=None, alpha_mask=None)
         cam_infos.append(cam_info)
     sys.stdout.write('\n')
@@ -111,8 +111,6 @@ def fetchPly(path):
     plydata = PlyData.read(path)
     vertices = plydata['vertex']
     positions = np.vstack([vertices['x'], vertices['y'], vertices['z']]).T
-#     colors = np.vstack([vertices['red'], vertices['green'], vertices['blue']]).T / 255.0
-#     normals = np.vstack([vertices['nx'], vertices['ny'], vertices['nz']]).T
     try:
         colors = np.vstack([vertices['red'], vertices['green'], vertices['blue']]).T / 255.0
     except ValueError as err:
@@ -131,7 +129,7 @@ def storePly(path, xyz, rgb):
     dtype = [('x', 'f4'), ('y', 'f4'), ('z', 'f4'),
             ('nx', 'f4'), ('ny', 'f4'), ('nz', 'f4'),
             ('red', 'u1'), ('green', 'u1'), ('blue', 'u1')]
-    
+
     normals = np.zeros_like(xyz)
 
     elements = np.empty(xyz.shape[0], dtype=dtype)
@@ -190,7 +188,7 @@ def readColmapSceneInfo(path, images, eval, llffhold=8):
                            ply_path=ply_path)
     return scene_info
 
-def readCamerasFromTransforms(path, transformsfile, white_background, extension=".png"):
+def readCamerasFromTransforms(path, transformsfile, white_background, extension=".png", relight=False):
     cam_infos = []
 
     with open(os.path.join(path, transformsfile)) as json_file:
@@ -198,11 +196,11 @@ def readCamerasFromTransforms(path, transformsfile, white_background, extension=
         if "camera_angle_x" not in contents.keys():
             fovx = None
         else:
-            fovx = contents["camera_angle_x"] 
+            fovx = contents["camera_angle_x"]
 
         frames = contents["frames"]
         for idx, frame in enumerate(frames):
-            cam_name = os.path.join(path, frame["file_path"] + extension)
+            cam_name = os.path.join(frame["file_path"] + extension)
 
             # matrix = np.linalg.inv(np.array(frame["transform_matrix"]))
             # R = -np.transpose(matrix[:3,:3])
@@ -229,17 +227,16 @@ def readCamerasFromTransforms(path, transformsfile, white_background, extension=
 
             norm_data = im_data / 255.0
             arr = norm_data[:,:,:3] * norm_data[:, :, 3:4] + bg * (1 - norm_data[:, :, 3:4])
-            image = Image.fromarray(np.array(arr*255.0, dtype=np.byte), "RGB")
-            alpha_mask = norm_data[:, :, 3]
-            alpha_mask = Image.fromarray(np.array(alpha_mask*255.0, dtype=np.byte), "L")
-            # arr = np.concatenate([arr, norm_data[:, :, 3:4]], axis=-1)
-            # image = Image.fromarray(np.array(arr*255.0, dtype=np.byte), "RGBA")
+            # image = Image.fromarray(np.array(arr*255.0, dtype=np.byte), "RGB")
+            alpha_mask = Image.fromarray(np.array(norm_data[:, :, 3]*255.0, dtype=np.byte), "L")
+            arr = np.concatenate([arr, norm_data[:, :, 3:4]], axis=-1)
+            image = Image.fromarray(np.array(arr*255.0, dtype=np.byte), "RGBA")
 
             normal_cam_name = os.path.join(path, frame["file_path"] + "_normal" + extension)
             normal_image_path = os.path.join(path, normal_cam_name)
             if os.path.exists(normal_image_path):
                 normal_image = Image.open(normal_image_path)
-                
+
                 normal_im_data = np.array(normal_image.convert("RGBA"))
                 normal_bg_mask = (normal_im_data==128).sum(-1)==3
                 normal_norm_data = normal_im_data / 255.0
@@ -255,25 +252,29 @@ def readCamerasFromTransforms(path, transformsfile, white_background, extension=
                 FovX = focal2fov(focal_length, image.size[0])
             else:
                 fovy = focal2fov(fov2focal(fovx, image.size[0]), image.size[1])
-                FovY = fovx 
+                FovY = fovx
                 FovX = fovy
 
             cam_infos.append(CameraInfo(uid=idx, R=R, T=T, FovY=FovY, FovX=FovX, image=image,
                             image_path=image_path, image_name=image_name, width=image.size[0], height=image.size[1], normal_image=normal_image, alpha_mask=alpha_mask))
-            
+
     return cam_infos
 
-def readNerfSyntheticInfo(path, white_background, eval, extension=".png"):
-    print("Reading Training Transforms")
-    train_cam_infos = readCamerasFromTransforms(path, "transforms_train.json", white_background, extension)
+def readNerfSyntheticInfo(path, white_background, eval, extension=".png", relight=False):
+    if not relight:
+        print("Reading Training Transforms")
+        train_cam_infos = readCamerasFromTransforms(path, "transforms_train.json", white_background, extension)
+    else:
+        train_cam_infos = []
+
     print("Reading Test Transforms")
     test_cam_infos = readCamerasFromTransforms(path, "transforms_test.json", white_background, extension)
-    
+
     if not eval:
         train_cam_infos.extend(test_cam_infos)
         test_cam_infos = []
 
-    nerf_normalization = getNerfppNorm(train_cam_infos)
+    nerf_normalization = getNerfppNorm(train_cam_infos) if not relight else None
 
     ply_path = os.path.join(path, "points3d.ply")
 
@@ -281,17 +282,17 @@ def readNerfSyntheticInfo(path, white_background, eval, extension=".png"):
         # Since this data set has no colmap data, we start with random points
         num_pts = 100_000
         print(f"Generating random point cloud ({num_pts})...")
-        
+
         # We create random points inside the bounds of the synthetic Blender scenes
         xyz = np.random.random((num_pts, 3)) * 2.6 - 1.3
         shs = np.random.random((num_pts, 3)) / 255.0
         pcd = BasicPointCloud(points=xyz, colors=SH2RGB(shs), normals=np.zeros((num_pts, 3)))
 
         storePly(ply_path, xyz, SH2RGB(shs) * 255)
-    try:
-        pcd = fetchPly(ply_path)
-    except:
-        pcd = None
+    # try:
+    pcd = fetchPly(ply_path)
+    # except:
+    #     pcd = None
 
     scene_info = SceneInfo(point_cloud=pcd,
                            train_cameras=train_cam_infos,

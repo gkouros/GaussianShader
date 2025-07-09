@@ -183,10 +183,13 @@ class EnvironmentLight(torch.nn.Module):
             # reflectance = specular_tint * fg_lookup[...,0:1] + fg_lookup[...,1:2]
             reflectance = spec_col * fg_lookup[...,0:1] + fg_lookup[...,1:2]
             specular_linear += spec * reflectance
+            
         extras = {"specular": specular_linear}
 
         diffuse_linear = torch.sigmoid(diffuse_raw - np.log(3.0))
         extras["diffuse"] = diffuse_linear
+        extras["reflvec"] = reflvec
+        extras["ndotv"] = NdotV
 
         rgb = specular_linear + diffuse_linear
 
@@ -197,16 +200,21 @@ class EnvironmentLight(torch.nn.Module):
 ######################################################################################
 
 # Load from latlong .HDR file
-def _load_env_hdr(fn, scale=1.0):
-    latlong_img = torch.tensor(util.load_image(fn), dtype=torch.float32, device='cuda')*scale
-    cubemap = util.latlong_to_cubemap(latlong_img, [512, 512])
+def _load_env_hdr(fn, scale=1.0, res=[64, 64], tonemap=lambda x: x, rotate=False):
+    latlong_img = util.load_image(fn)
+    latlong_img = tonemap(latlong_img)
+    latlong_img = torch.tensor(latlong_img, dtype=torch.float32, device='cuda')*scale
+    if rotate:
+        cubemap = util.latlong_to_cubemap_orig(latlong_img, [512, 512])
+    else:
+        cubemap = util.latlong_to_cubemap(latlong_img, [512, 512])
     l = EnvironmentLight(cubemap)
     l.build_mips()
     return l
 
-def load_env(fn, scale=1.0):
-    if os.path.splitext(fn)[1].lower() == ".hdr":
-        return _load_env_hdr(fn, scale)
+def load_env(fn, scale=1.0, res=[64, 64], tonemap=lambda x: x, rotate=False):
+    if any([fn.lower().endswith(x) for x in [".hdr", ".hdri", ".exr", ".tiff", ".pfm"]]):
+        return _load_env_hdr(fn, scale, res, tonemap, rotate)
     else:
         assert False, "Unknown envlight extension %s" % os.path.splitext(fn)[1]
 
@@ -214,13 +222,13 @@ def save_env_map(fn, light):
     color = extract_env_map(light, [512, 1024])
     util.save_image_raw(fn, color.detach().cpu().numpy())
     util.save_image(fn.replace('hdr', 'png'), color.detach().cpu().numpy())
-    util.save_image('tonemapped_'+fn.replace('hdr', 'png'), gamma_tonemap(color.detach().cpu().numpy()))
+    # util.save_image(fn.replace('.hdr', '_tonemapped.png'), gamma_tonemap(color.detach().cpu().numpy()))
 
 def save_env_map2(fn, light):
     color = extract_env_map2(light, [512, 1024])
     util.save_image_raw(fn, color.detach().cpu().numpy())
-    util.save_image(fn.replace('hdr', 'png'), color.detach().cpu().numpy())
-    util.save_image('tonemapped_'+fn.replace('hdr', 'png'), gamma_tonemap(color.detach().cpu().numpy()))
+    util.save_image(fn.replace('.hdr', '.png'), color.detach().cpu().numpy())
+    # util.save_image(fn.replace('.hdr', '_tonemapped.png'), gamma_tonemap(color.detach().cpu().numpy()))
 
 ######################################################################################
 # Create trainable env map with random initialization

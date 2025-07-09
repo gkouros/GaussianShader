@@ -3,7 +3,7 @@
 # GRAPHDECO research group, https://team.inria.fr/graphdeco
 # All rights reserved.
 #
-# This software is free for non-commercial, research and evaluation use 
+# This software is free for non-commercial, research and evaluation use
 # under the terms of the LICENSE.md file.
 #
 # For inquiries contact  george.drettakis@inria.fr
@@ -13,7 +13,7 @@ from scene.cameras import Camera
 import numpy as np
 from utils.general_utils import PILtoTorch
 from utils.graphics_utils import fov2focal
-import torch 
+import torch
 
 WARNED = False
 
@@ -47,11 +47,11 @@ def loadCam(args, id, cam_info, resolution_scale):
         gt_normal_image = resized_normal_image_rgb[:3, ...]
     else:
         gt_normal_image = None
-    loaded_mask = None
 
+    loaded_mask = resized_image_rgb[3:4, ...] if resized_image_rgb.shape[0] == 4 else None
 
-    return Camera(colmap_id=cam_info.uid, R=cam_info.R, T=cam_info.T, 
-                  FoVx=cam_info.FovX, FoVy=cam_info.FovY, 
+    return Camera(colmap_id=cam_info.uid, R=cam_info.R, T=cam_info.T,
+                  FoVx=cam_info.FovX, FoVy=cam_info.FovY,
                   image=gt_image, gt_alpha_mask=loaded_mask,
                   image_name=cam_info.image_name, uid=id, data_device=args.data_device, normal_image=gt_normal_image)
 

@@ -120,21 +120,21 @@ def cube_to_dir(s, x, y):
     elif s == 5: rx, ry, rz = -x, -y, -torch.ones_like(x)
     return torch.stack((rx, ry, rz), dim=-1)
 
-# def latlong_to_cubemap(latlong_map, res):
-#     cubemap = torch.zeros(6, res[0], res[1], latlong_map.shape[-1], dtype=torch.float32, device='cuda')
-#     for s in range(6):
-#         gy, gx = torch.meshgrid(torch.linspace(-1.0 + 1.0 / res[0], 1.0 - 1.0 / res[0], res[0], device='cuda'),
-#                                 torch.linspace(-1.0 + 1.0 / res[1], 1.0 - 1.0 / res[1], res[1], device='cuda'),
-#                                 # indexing='ij')
-#                                 )
-#         v = safe_normalize(cube_to_dir(s, gx, gy))
+def latlong_to_cubemap_orig(latlong_map, res):
+    cubemap = torch.zeros(6, res[0], res[1], latlong_map.shape[-1], dtype=torch.float32, device='cuda')
+    for s in range(6):
+        gy, gx = torch.meshgrid(torch.linspace(-1.0 + 1.0 / res[0], 1.0 - 1.0 / res[0], res[0], device='cuda'),
+                                torch.linspace(-1.0 + 1.0 / res[1], 1.0 - 1.0 / res[1], res[1], device='cuda'),
+                                # indexing='ij')
+                                )
+        v = safe_normalize(cube_to_dir(s, gx, gy))
 
-#         tu = torch.atan2(v[..., 0:1], -v[..., 2:3]) / (2 * np.pi) + 0.5
-#         tv = torch.acos(torch.clamp(v[..., 1:2], min=-1, max=1)) / np.pi
-#         texcoord = torch.cat((tu, tv), dim=-1)
+        tu = torch.atan2(v[..., 0:1], -v[..., 2:3]) / (2 * np.pi) + 0.5
+        tv = torch.acos(torch.clamp(v[..., 1:2], min=-1, max=1)) / np.pi
+        texcoord = torch.cat((tu, tv), dim=-1)
 
-#         cubemap[s, ...] = dr.texture(latlong_map[None, ...], texcoord[None, ...], filter_mode='linear')[0]
-#     return cubemap
+        cubemap[s, ...] = dr.texture(latlong_map[None, ...], texcoord[None, ...], filter_mode='linear')[0]
+    return cubemap
 
 # def latlong_to_cubemap(latlong_map, res):
 #     cubemap = torch.zeros(6, res[0], res[1], latlong_map.shape[-1], dtype=torch.float32, device='cuda')
