@@ -16,7 +16,7 @@ from scene.gaussian_model import GaussianModel
 from utils.sh_utils import eval_sh
 from utils.graphics_utils import normal_from_depth_image
 from utils.general_utils import flip_align_view
-from scene.NVDIFFREC import extract_env_map
+from scene.NVDIFFREC import extract_env_map, extract_env_map2
 
 def rendered_world2cam(viewpoint_cam, normal, alpha, bg_color):
     # normal: (3, H, W), alpha: (H, W), bg_color: (3)

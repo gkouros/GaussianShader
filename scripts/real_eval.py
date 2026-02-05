@@ -10,14 +10,23 @@ import argparse
 
 parser = argparse.ArgumentParser(description="Training script parameters")
 parser.add_argument('out', help='Input experiment name')
+parser.add_argument('--scene', help='Select which scene to learn', default='all')
 parser.add_argument('--skip_train', help='Skip training step', action='store_true')
 parser.add_argument('--skip_render', help='Skip rendering step', action='store_true')
 parser.add_argument('--skip_metrics', help='Skip rendering step', action='store_true')
+parser.add_argument('--render_path', help='Render path step', action='store_true')
 
 args = parser.parse_args()
 
 dataset = "ref_real"
 scenes = ["gardenspheres", "sedan", "toycar"]
+resolutions = {"gardenspheres":4, "sedan":8, "toycar":4} # set to 4 for gardenspheres and toycar, 8 for sedan
+
+if args.scene != 'all':
+    if args.scene in scenes:
+        scenes = [args.scene]
+    else:
+        raise RuntimeError(f'Scene {args.scene} does not exist in glossy-synthetic dataset')
 
 factors = [1]
 
@@ -38,7 +47,7 @@ def run_script(command):
 
 def train_scene(gpu, scene, factor):
     if not args.skip_train:
-        cmd = f"OMP_NUM_THREADS=4 CUDA_VISIBLE_DEVICES={gpu} python train.py -s {dataset_dir}/{scene} -m {output_dir}/{scene} --white_background --eval"
+        cmd = f"OMP_NUM_THREADS=4 CUDA_VISIBLE_DEVICES={gpu} python train.py -s {dataset_dir}/{scene} -m {output_dir}/{scene} --white_background --eval -r {resolutions[scene]}"
         print(cmd)
         run_script(cmd)
 
@@ -50,6 +59,10 @@ def train_scene(gpu, scene, factor):
     if not args.skip_metrics:
         cmd = f"OMP_NUM_THREADS=4 CUDA_VISIBLE_DEVICES={gpu} python metrics.py -m {output_dir}/{scene}"
         print(cmd)
+        run_script(cmd)
+
+    if args.render_path:
+        cmd = f"OMP_NUM_THREADS=4 CUDA_VISIBLE_DEVICES={gpu} python render.py -m {output_dir}/{scene} --skip_train --skip_test --render_path"
         run_script(cmd)
 
     return True

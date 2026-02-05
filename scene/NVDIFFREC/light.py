@@ -240,10 +240,10 @@ def create_trainable_env_rnd(base_res, scale=0.5, bias=0.25):
 
 def extract_env_map(light, resolution=[512, 1024]):
     assert isinstance(light, EnvironmentLight), "Can only save EnvironmentLight currently"
-    color = util.cubemap_to_latlong(light.base, resolution)
+    color = util.cubemap_to_latlong_orig(light.base, resolution)
     return color
 
 def extract_env_map2(light, resolution=[512, 1024]):
     assert isinstance(light, EnvironmentLight), "Can only save EnvironmentLight currently"
-    color = util.cubemap_to_latlong2(light.base, resolution)
+    color = util.cubemap_to_latlong(light.base, resolution)
     return color

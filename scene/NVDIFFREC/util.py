@@ -134,23 +134,8 @@ def latlong_to_cubemap_orig(latlong_map, res):
         texcoord = torch.cat((tu, tv), dim=-1)
 
         cubemap[s, ...] = dr.texture(latlong_map[None, ...], texcoord[None, ...], filter_mode='linear')[0]
+
     return cubemap
-
-# def latlong_to_cubemap(latlong_map, res):
-#     cubemap = torch.zeros(6, res[0], res[1], latlong_map.shape[-1], dtype=torch.float32, device='cuda')
-#     for s in range(6):
-#         gy, gx = torch.meshgrid(torch.linspace(-1.0 + 1.0 / res[0], 1.0 - 1.0 / res[0], res[0], device='cuda'),
-#                                 torch.linspace(-1.0 + 1.0 / res[1], 1.0 - 1.0 / res[1], res[1], device='cuda'),
-#                                 # indexing='ij')
-#                                 )
-#         v = safe_normalize(cube_to_dir(s, gx, gy))
-
-#         tu = torch.atan2(v[..., 0:1], -v[..., 2:3]) / (2 * np.pi) + 0.5
-#         tv = torch.acos(torch.clamp(v[..., 1:2], min=-1, max=1)) / np.pi
-#         texcoord = torch.cat((tu, tv), dim=-1)
-
-#         cubemap[s, ...] = dr.texture(latlong_map[None, ...], texcoord[None, ...], filter_mode='linear')[0]
-#     return cubemap
 
 def latlong_to_cubemap(latlong_map, res):
     cubemap = torch.zeros(6, res[0], res[1], latlong_map.shape[-1], dtype=torch.float32, device='cuda')
@@ -170,22 +155,15 @@ def latlong_to_cubemap(latlong_map, res):
 
     return cubemap
 
-# def cubemap_to_latlong(cubemap, res):
-#     gy, gx = torch.meshgrid(torch.linspace( 0.0 + 1.0 / res[0], 1.0 - 1.0 / res[0], res[0], device='cuda'),
-#                             torch.linspace(-1.0 + 1.0 / res[1], 1.0 - 1.0 / res[1], res[1], device='cuda'),
-#                             # indexing='ij')
-#                             )
-
-#     sintheta, costheta = torch.sin(gy*np.pi), torch.cos(gy*np.pi)
-#     sinphi, cosphi     = torch.sin(gx*np.pi), torch.cos(gx*np.pi)
-
-#     reflvec = torch.stack((
-#         sintheta*sinphi,
-#         costheta,
-#         -sintheta*cosphi
-#         ), dim=-1)
-#     return dr.texture(cubemap[None, ...], reflvec[None, ...].contiguous(), filter_mode='linear', boundary_mode='cube')[0]
-
+def cubemap_to_latlong_orig(cubemap, res):
+    gy, gx = torch.meshgrid(torch.linspace( 0.0 + 1.0 / res[0], 1.0 - 1.0 / res[0], res[0], device='cuda'),
+                            torch.linspace(-1.0 + 1.0 / res[1], 1.0 - 1.0 / res[1], res[1], device='cuda'),
+                            indexing='ij'
+    )
+    sintheta, costheta = torch.sin(gy*np.pi), torch.cos(gy*np.pi)
+    sinphi, cosphi     = torch.sin(gx*np.pi), torch.cos(gx*np.pi)
+    reflvec = torch.stack((sintheta*sinphi, costheta, -sintheta*cosphi), dim=-1)
+    return dr.texture(cubemap[None, ...], reflvec[None, ...].contiguous(), filter_mode='linear', boundary_mode='cube')[0]
 
 def cubemap_to_latlong(cubemap, res):
     X, Y = np.meshgrid(np.linspace(-np.pi, np.pi, res[1], dtype=np.float32), np.linspace(0, np.pi, res[0], dtype=np.float32), indexing='xy')
@@ -194,15 +172,6 @@ def cubemap_to_latlong(cubemap, res):
     x = np.sin(XY[..., 1]) * np.cos(XY[...,0])
     y = -np.sin(XY[..., 1]) * np.sin(XY[...,0])
     reflvec = torch.tensor(np.stack([x,y,z], axis=-1)).cuda()
-    return dr.texture(cubemap[None, ...], reflvec[None, ...].contiguous(), filter_mode='linear', boundary_mode='cube')[0]
-
-def cubemap_to_latlong2(cubemap, res):
-    gy, gx = torch.meshgrid(torch.linspace( 0.0 + 1.0 / res[0], 1.0 - 1.0 / res[0], res[0], device='cuda'),
-                            torch.linspace(-1.0 + 1.0 / res[1], 1.0 - 1.0 / res[1], res[1], device='cuda'))
-                            # indexing='ij')
-    sintheta, costheta = torch.sin(gx*np.pi), torch.cos(gx*np.pi)
-    sinphi, cosphi     = torch.sin(gy*np.pi), torch.cos(gy*np.pi)
-    reflvec = torch.stack((sintheta*sinphi, costheta, -sintheta*cosphi), dim=-1)
     return dr.texture(cubemap[None, ...], reflvec[None, ...].contiguous(), filter_mode='linear', boundary_mode='cube')[0]
 
 #----------------------------------------------------------------------------
